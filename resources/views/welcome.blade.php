@@ -49,15 +49,26 @@
             .then(res => res.json())
             .then(user => {
                 document.getElementById('welcomeMsg').textContent = `Welcome, ${user.name}!`;
-
+                const profileIcon = document.getElementById('profileIcon');
+                if (user.avatar_url) {
+                           profileIcon.src = user.avatar_url; // show user's uploaded avatar
+                       } else {
+                       profileIcon.src = 'https://via.placeholder.com/40'; // fallback placeholder
+                       }
                 const sidebar = document.getElementById('sidebar');
                 sidebar.innerHTML = `<h2 class="text-xl font-bold mb-20">Dashboard</h2>`;
 
-                // Posts
+
+
+                // ----------------- Sidebar  post-------------------
                 const postsDiv = document.createElement('div');
                 postsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
                 postsDiv.textContent = 'Posts';
-                postsDiv.addEventListener('click', () => loadPosts());
+                postsDiv.addEventListener('click', () => {
+                 // set active
+                loadPosts();
+                localStorage.setItem('activeSection', 'posts');
+               });
                 sidebar.appendChild(postsDiv);
 
                 // Comments (admin only)
@@ -65,13 +76,20 @@
                     const commentsDiv = document.createElement('div');
                     commentsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
                     commentsDiv.textContent = 'Comments';
-                    commentsDiv.addEventListener('click', () => loadComments());
+                    commentsDiv.addEventListener('click', () =>{
+                        localStorage.setItem('activeSection', 'comments');
+                        loadComments();
+                    });
                     sidebar.appendChild(commentsDiv);
 
                     const userInfoDiv = document.createElement('div');
                     userInfoDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
                     userInfoDiv.textContent = 'User Info';
-                    userInfoDiv.addEventListener('click', () => loadUserInfo());
+                    userInfoDiv.addEventListener('click', () => {
+
+                          loadUserInfo(1); // default page 1
+                        localStorage.setItem('activeSection', 'userInfo');
+                           });
                     sidebar.appendChild(userInfoDiv);
                 }
 
@@ -99,7 +117,7 @@
                 // -------------------------------
                 // Functions for User Info
                 // -------------------------------
-                function loadUserInfo() {
+                function loadUserInfo(page =1) {
                     fetch('/api/users', {
                         headers: {
                             'Authorization': 'Bearer ' + token,
@@ -110,10 +128,12 @@
                     .then(data => {
                         const users = data.users;
                         const itemsPerPage = 10;
-                        let currentPage = 1;
+                        let currentPage = page;
                         const totalPages = Math.ceil(users.length / itemsPerPage);
 
                         function renderTable(page) {
+                            currentPage = page;
+                            localStorage.setItem('currentPage', currentPage);
                             let start = (page - 1) * itemsPerPage;
                             let end = start + itemsPerPage;
                             let paginatedUsers = users.slice(start, end);
@@ -143,9 +163,10 @@
                                         <td class="border p-2">${u.name}</td>
                                         <td class="border p-2">${u.email}</td>
                                         <td class="border p-2">${u.role || '-'}</td>
-                                        <td class="border p-2">
-                                            <img src="${u.avatar || 'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full mx-auto">
-                                        </td>
+
+                                        <td class="border p-2 text-center">
+                                         ${u.avatar_url ? `<img src="${u.avatar_url}" class="w-12 h-12 mx-auto">` : 'No avatar'}</td>
+
                                         <td class="border p-2">
                                             <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editUserForm(${u.id}, '${u.name}', '${u.email}', '${u.role}')">Edit</button>
                                             <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deleteUser(${u.id})">Delete</button>
@@ -235,6 +256,7 @@ window.editUserForm = function(id, name, email, role) {
                 <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
                 <option value="user" ${role==='user'?'selected':''}>User</option>
             </select>
+            <input type="file" name="avatar" accept="image/*" class="border p-2 w-full">
             <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Update</button>
         </form>
     `;
@@ -269,6 +291,20 @@ window.deleteUser = function(id) {
     .then(() => loadUserInfo()) // 🔹 refresh table
     .catch(() => alert('Error deleting user'));
 }
+
+// Restore last active section on refresh
+// -------------------------------
+const activeSection = localStorage.getItem('activeSection');
+const lastPage = parseInt(localStorage.getItem('currentPage')) || 1;
+
+if(activeSection === 'posts') {
+    loadPosts();
+} else if(activeSection === 'userInfo' && user.role === 'admin') {
+    loadUserInfo(lastPage); // pass last page
+} else {
+    document.getElementById('mainContent').innerHTML = `<p>Select a section to view information...</p>`;
+}
+
 
 
             })

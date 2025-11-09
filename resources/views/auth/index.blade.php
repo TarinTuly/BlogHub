@@ -14,7 +14,7 @@
     <!-- Register Section -->
     <div id="registerSection">
         <h2 class="text-2xl font-bold mb-4 text-center">Register</h2>
-        <form id="registerForm" class="flex flex-col">
+        <form id="registerForm" class="flex flex-col" enctype="multipart/form-data">
             <input type="text" name="name" placeholder="Name" class="border p-2 rounded mb-1" required>
             <span id="register_name_error" class="text-red-600 text-sm mb-2"></span>
 
@@ -26,7 +26,10 @@
 
             <input type="password" name="password_confirmation" placeholder="Confirm Password" class="border p-2 rounded mb-1" required>
             <span id="register_password_confirmation_error" class="text-red-600 text-sm mb-2"></span>
-
+             <!-- #region
+            <!-- New avatar input -->
+             <input type="file" name="avatar" accept="image/*" class="border p-2 rounded mb-1">
+             <span id="register_avatar_error" class="text-red-600 text-sm mb-2"></span>
             <button type="submit" class="bg-blue-500 text-white py-2 rounded hover:bg-blue-600 mt-2">Register</button>
         </form>
         <p id="registerMsg" class="mt-2 text-center"></p>
@@ -95,32 +98,40 @@ function showMessage(id,msg,isError=false){
 }
 
 // Register
-document.getElementById('registerForm').addEventListener('submit', async e=>{
+// Register
+document.getElementById('registerForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target).entries());
+
+    const form = e.target;
+    const formData = new FormData(form); // <-- use FormData to include file
+
     clearErrors('register');
+
     try {
         const res = await fetch('/api/register', {
-            method:'POST',
-            headers:{
-                'Content-Type':'application/json',
-                'Accept':'application/json'
-            },
-            body:JSON.stringify(data)
+            method: 'POST',
+            body: formData, // <-- send as FormData
+            headers: {
+                'Accept': 'application/json' // Don't set Content-Type, browser will handle it
+            }
         });
+
         const json = await res.json();
-        if(res.ok){
-            showMessage('registerMsg','Registered successfully! Please login.');
+
+        if (res.ok) {
+            showMessage('registerMsg', 'Registered successfully! Please login.');
             toggleSection('login');
-        } else if(res.status===422){
+        } else if (res.status === 422) {
             showFieldErrors('register', json.errors);
         } else {
             showMessage('registerMsg', json.message, true);
         }
-    } catch(err){
+
+    } catch (err) {
         showMessage('registerMsg', err.message, true);
     }
 });
+
 
 // Login
 document.getElementById('loginForm').addEventListener('submit', async e=>{

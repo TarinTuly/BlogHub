@@ -66,27 +66,43 @@ class AuthController extends Controller
      *      )
      * )
      */
-    public function register(Request $request)
-    {
-        $f = $request->validate([
-            'name' => 'required|string|max:255|unique:users,name',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|confirmed|min:4'
-        ]);
+public function register(Request $request)
+{
+    $f = $request->validate([
+        'name' => 'required|string|max:255|unique:users,name',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|confirmed|min:4',
+        'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+    ]);
 
-        $user = User::create([
-            'name' => $f['name'],
-            'email' => $f['email'],
-            'password' => bcrypt($f['password']),
-        ]);
-
-        $token = $user->createToken($user->name)->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'token' => $token
-        ]);
+    $avatarPath = null;
+    if ($request->hasFile('avatar')) {
+        $avatarPath = $request->file('avatar')->store('avatars', 'public'); // saved in storage/app/public/avatars
     }
+
+    $user = User::create([
+        'name' => $f['name'],
+        'email' => $f['email'],
+        'password' => bcrypt($f['password']),
+        'role' => $request->role ?? 'user',
+        'avatar' => $avatarPath
+    ]);
+
+    $token = $user->createToken($user->name)->plainTextToken;
+
+    $userData = $user->toArray();
+    if ($user->avatar) {
+       $userData['avatar_url'] = asset('storage/' . $user->avatar);
+    } else {
+       $userData['avatar_url'] = null;
+     }
+
+    return response()->json([
+        'user' => $user,
+        'token' => $token
+    ]);
+}
+
 
     /**
  * @OA\Get(
@@ -121,18 +137,20 @@ public function getAllUsers(Request $request)
 {
     $user = $request->user();
 
-    // Only admin can access
     if ($user->role !== 'admin') {
-        return response()->json([
-            'message' => 'Unauthorized'
-        ], 403); // 403 Forbidden
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
 
-    $users = User::select('id', 'name', 'email','password','role', 'created_at')->get();
+    $users = User::select('id', 'name', 'email', 'role', 'avatar', 'created_at')->get();
 
-    return response()->json([
-        'users' => $users
-    ]);
+// Add avatar_url for each user
+$users = $users->map(function($u){
+    $u->avatar_url = $u->avatar ? asset('storage/' . $u->avatar) : null;
+    return $u;
+});
+
+return response()->json(['users' => $users]);
+
 }
 
 
@@ -316,9 +334,19 @@ public function getUserById(Request $request, $id)
         if (isset($f['password'])) $user->password = bcrypt($f['password']);
         if (isset($f['role'])) $user->role = $f['role'];
 
-        $user->save();
+       // Handle avatar upload
+    if ($request->hasFile('avatar')) {
+        // Optional: delete old avatar if exists
+        if ($user->avatar && file_exists(storage_path('app/public/' . $user->avatar))) {
+            unlink(storage_path('app/public/' . $user->avatar));
+        }
 
-        return response()->json(['user' => $user]);
+        $user->avatar = $request->file('avatar')->store('avatars', 'public');
+    }
+
+    $user->save();
+
+    return response()->json($user);
     }
 
     // ------------------- Delete User -------------------
@@ -346,7 +374,10 @@ public function getUserById(Request $request, $id)
 
         $user = User::find($id);
         if (!$user) return response()->json(['message' => 'User not found'], 404);
-
+        // Delete avatar from storage if exists
+    if ($user->avatar && file_exists(storage_path('app/public/' . $user->avatar))) {
+        unlink(storage_path('app/public/' . $user->avatar));
+    }
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully']);
