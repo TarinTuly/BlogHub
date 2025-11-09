@@ -35,159 +35,246 @@
     </div>
 
     <script>
-    const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('auth_token');
 
-    if (!token) {
-        window.location.href = '/'; // redirect to login
-    } else {
-        fetch('/api/user', {
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Accept': 'application/json'
-            }
+        if (!token) {
+            window.location.href = '/'; // redirect to login
+        } else {
+            fetch('/api/user', {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(user => {
+                document.getElementById('welcomeMsg').textContent = `Welcome, ${user.name}!`;
+
+                const sidebar = document.getElementById('sidebar');
+                sidebar.innerHTML = `<h2 class="text-xl font-bold mb-20">Dashboard</h2>`;
+
+                // Posts
+                const postsDiv = document.createElement('div');
+                postsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
+                postsDiv.textContent = 'Posts';
+                postsDiv.addEventListener('click', () => loadPosts());
+                sidebar.appendChild(postsDiv);
+
+                // Comments (admin only)
+                if (user.role === 'admin') {
+                    const commentsDiv = document.createElement('div');
+                    commentsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
+                    commentsDiv.textContent = 'Comments';
+                    commentsDiv.addEventListener('click', () => loadComments());
+                    sidebar.appendChild(commentsDiv);
+
+                    const userInfoDiv = document.createElement('div');
+                    userInfoDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
+                    userInfoDiv.textContent = 'User Info';
+                    userInfoDiv.addEventListener('click', () => loadUserInfo());
+                    sidebar.appendChild(userInfoDiv);
+                }
+
+                // Logout
+                const logoutDiv = document.createElement('div');
+                logoutDiv.className =
+                    'mt-auto text-center font-bold text-lg hover:bg-red-500 cursor-pointer py-2 rounded bg-red-600';
+                logoutDiv.textContent = 'Logout';
+                logoutDiv.addEventListener('click', () => {
+                    fetch('/api/logout', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(() => {
+                        localStorage.removeItem('auth_token');
+                        window.location.href = '/';
+                    })
+                    .catch(() => alert('Error logging out!'));
+                });
+                sidebar.appendChild(logoutDiv);
+
+                // -------------------------------
+                // Functions for User Info
+                // -------------------------------
+                function loadUserInfo() {
+                    fetch('/api/users', {
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        const users = data.users;
+                        const itemsPerPage = 10;
+                        let currentPage = 1;
+                        const totalPages = Math.ceil(users.length / itemsPerPage);
+
+                        function renderTable(page) {
+                            let start = (page - 1) * itemsPerPage;
+                            let end = start + itemsPerPage;
+                            let paginatedUsers = users.slice(start, end);
+
+                            let html = `
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl font-bold">User Info</h2>
+                                    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addUserForm()">+ Add User</button>
+                                </div>
+
+                                <table class="table-auto w-full border border-gray-300 text-center">
+                                    <thead>
+                                        <tr class="bg-blue-600 text-white font-bold">
+                                            <th class="border p-2">Name</th>
+                                            <th class="border p-2">Email</th>
+                                            <th class="border p-2">Role</th>
+                                            <th class="border p-2">Profile</th>
+                                            <th class="border p-2">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                            `;
+
+                            paginatedUsers.forEach(u => {
+                                html += `
+                                    <tr class="hover:bg-gray-100">
+                                        <td class="border p-2">${u.name}</td>
+                                        <td class="border p-2">${u.email}</td>
+                                        <td class="border p-2">${u.role || '-'}</td>
+                                        <td class="border p-2">
+                                            <img src="${u.avatar || 'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full mx-auto">
+                                        </td>
+                                        <td class="border p-2">
+                                            <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editUserForm(${u.id}, '${u.name}', '${u.email}', '${u.role}')">Edit</button>
+                                            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deleteUser(${u.id})">Delete</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            });
+
+                            html += `</tbody></table>
+                                <div class="flex justify-center items-center gap-2 mt-4">
+                                    <button id="prevPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${page === 1 ? 'disabled' : ''}>Prev</button>
+                                    <span class="text-gray-700">Page ${page} of ${totalPages}</span>
+                                    <button id="nextPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${page === totalPages ? 'disabled' : ''}>Next</button>
+                                </div>
+                            `;
+
+                            document.getElementById('mainContent').innerHTML = html;
+
+                            document.getElementById('prevPage').addEventListener('click', () => {
+                                if (currentPage > 1) {
+                                    currentPage--;
+                                    renderTable(currentPage);
+                                }
+                            });
+
+                            document.getElementById('nextPage').addEventListener('click', () => {
+                                if (currentPage < totalPages) {
+                                    currentPage++;
+                                    renderTable(currentPage);
+                                }
+                            });
+                        }
+
+                        renderTable(currentPage);
+                    })
+                    .catch(() => {
+                        document.getElementById('mainContent').innerHTML = `<p>Error fetching users</p>`;
+                    });
+                }
+
+
+                       // ---------------------- Add User ------------------------
+
+
+
+                // ------------------- Add User Form -------------------
+window.addUserForm = function() {
+    document.getElementById('mainContent').innerHTML = `
+        <h2 class="text-xl font-bold mb-4">Add New User</h2>
+        <form id="addUserForm" class="space-y-4">
+            <input type="text" name="name" placeholder="Name" class="border p-2 w-full rounded" required>
+            <input type="email" name="email" placeholder="Email" class="border p-2 w-full rounded" required>
+            <input type="password" name="password" placeholder="Password" class="border p-2 w-full rounded" required>
+            <input type="password" name="password_confirmation" placeholder="Confirm Password" class="border p-2 w-full rounded" required>
+            <select name="role" class="border p-2 w-full rounded" required>
+                <option value="">Select Role</option>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+            </select>
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
+        </form>
+    `;
+
+    document.getElementById('addUserForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: formData
         })
         .then(res => res.json())
-        .then(user => {
-            document.getElementById('welcomeMsg').textContent = `Welcome, ${user.name}!`;
+        .then(() => loadUserInfo()) // 🔹 refresh table like loadUserInfo
+        .catch(() => alert('Error adding user'));
+    });
+}
 
-            const sidebar = document.getElementById('sidebar');
-            sidebar.innerHTML = `<h2 class="text-xl font-bold mb-20">Dashboard</h2>`;
+// ------------------- Edit User Form -------------------
+window.editUserForm = function(id, name, email, role) {
+    document.getElementById('mainContent').innerHTML = `
+        <h2 class="text-xl font-bold mb-4">Edit User</h2>
+        <form id="editUserForm" class="space-y-4">
+            <input type="text" name="name" value="${name}" class="border p-2 w-full rounded" required>
+            <input type="email" name="email" value="${email}" class="border p-2 w-full rounded" required>
+            <select name="role" class="border p-2 w-full rounded" required>
+                <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
+                <option value="user" ${role==='user'?'selected':''}>User</option>
+            </select>
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Update</button>
+        </form>
+    `;
 
-            // Posts
-            const postsDiv = document.createElement('div');
-            postsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
-            postsDiv.textContent = 'Posts';
-            postsDiv.addEventListener('click', () => loadPosts());
-            sidebar.appendChild(postsDiv);
+    document.getElementById('editUserForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
 
-            // Comments (admin only)
-            if (user.role === 'admin') {
-                const commentsDiv = document.createElement('div');
-                commentsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
-                commentsDiv.textContent = 'Comments';
-                commentsDiv.addEventListener('click', () => loadComments());
-                sidebar.appendChild(commentsDiv);
+        fetch(`/api/users/${id}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'X-HTTP-Method-Override': 'PUT'
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(() => loadUserInfo()) // 🔹 refresh table
+        .catch(() => alert('Error updating user'));
+    });
+}
 
-                const userInfoDiv = document.createElement('div');
-                userInfoDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
-                userInfoDiv.textContent = 'User Info';
-                userInfoDiv.addEventListener('click', () => loadUserInfo());
-                sidebar.appendChild(userInfoDiv);
-            }
+// ------------------- Delete User -------------------
+window.deleteUser = function(id) {
+    if(!confirm('Are you sure?')) return;
 
-            // Logout
-            const logoutDiv = document.createElement('div');
-            logoutDiv.className = 'mt-auto text-center font-bold text-lg hover:bg-red-500 cursor-pointer py-2 rounded bg-red-600';
-            logoutDiv.textContent = 'Logout';
-            logoutDiv.addEventListener('click', () => {
-                fetch('/api/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(() => {
-                    localStorage.removeItem('auth_token');
-                    window.location.href = '/';
-                })
-                .catch(() => alert('Error logging out!'));
-            });
-            sidebar.appendChild(logoutDiv);
+    fetch(`/api/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(res => res.json())
+    .then(() => loadUserInfo()) // 🔹 refresh table
+    .catch(() => alert('Error deleting user'));
+}
 
-            // -------------------------------
-            // 🔹 keep your loadPosts() and loadComments() here
-            // -------------------------------
 
-            // 🔹 paste the updated loadUserInfo() function here
-            function loadUserInfo() {
-                fetch('/api/users', {
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(res => res.json())
-                .then(data => {
-                    const users = data.users;
-                    const itemsPerPage = 10;
-                    let currentPage = 1;
-                    const totalPages = Math.ceil(users.length / itemsPerPage);
-
-                    function renderTable(page) {
-                        let start = (page - 1) * itemsPerPage;
-                        let end = start + itemsPerPage;
-                        let paginatedUsers = users.slice(start, end);
-
-                        let html = `
-                        <h2 class="text-xl font-bold mb-4">User Info</h2>
-                        <table class="table-auto w-full border border-gray-300 text-center">
-                            <thead>
-                                <tr class="bg-blue-600 text-white font-bold">
-                                    <th class="border p-2">Name</th>
-                                    <th class="border p-2">Email</th>
-                                    <th class="border p-2">Role</th>
-                                    <th class="border p-2">Profile</th>
-                                    <th class="border p-2">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        `;
-
-                        paginatedUsers.forEach(u => {
-                            html += `
-                                <tr class="hover:bg-gray-100">
-                                    <td class="border p-2">${u.name}</td>
-                                    <td class="border p-2">${u.email}</td>
-                                    <td class="border p-2">${u.role || '-'}</td>
-                                    <td class="border p-2">
-                                        <img src="${u.avatar || 'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full mx-auto">
-                                    </td>
-                                    <td class="border p-2">
-                                        <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editUser(${u.id})">Edit</button>
-                                        <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deleteUser(${u.id})">Delete</button>
-                                    </td>
-                                </tr>
-                            `;
-                        });
-
-                        html += `</tbody></table>
-                            <div class="flex justify-center items-center gap-2 mt-4">
-                                <button id="prevPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${page === 1 ? 'disabled' : ''}>Prev</button>
-                                <span class="text-gray-700">Page ${page} of ${totalPages}</span>
-                                <button id="nextPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                            </div>
-                        `;
-
-                        document.getElementById('mainContent').innerHTML = html;
-
-                        document.getElementById('prevPage').addEventListener('click', () => {
-                            if (currentPage > 1) {
-                                currentPage--;
-                                renderTable(currentPage);
-                            }
-                        });
-
-                        document.getElementById('nextPage').addEventListener('click', () => {
-                            if (currentPage < totalPages) {
-                                currentPage++;
-                                renderTable(currentPage);
-                            }
-                        });
-                    }
-
-                    renderTable(currentPage);
-                })
-                .catch(() => {
-                    document.getElementById('mainContent').innerHTML = `<p>Error fetching users</p>`;
-                });
-            }
-
-        }) // 👈 closes the `.then(user => { ... })`
-        .catch(() => window.location.href = '/');
-    } // 👈 closes the `else { ... }`
-</script>
+            })
+            .catch(() => window.location.href = '/');
+        }
+    </script>
 
 </body>
-
 </html>

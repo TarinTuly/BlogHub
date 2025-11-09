@@ -243,6 +243,7 @@ public function getUserById(Request $request, $id)
         ]);
     }
 
+
     /**
      * @OA\Post(
      *      path="/api/logout",
@@ -268,5 +269,88 @@ public function getUserById(Request $request, $id)
         'message' => 'You are logged out'
     ]);
 }
+/**
+     * @OA\Put(
+     *      path="/api/users/{id}",
+     *      summary="Update an existing user",
+     *      tags={"Auth"},
+     *      security={{"sanctum":{}}},
+     *      @OA\Parameter(
+     *          name="id",
+     *          in="path",
+     *          required=true,
+     *          @OA\Schema(type="integer")
+     *      ),
+     *      @OA\RequestBody(
+     *          required=true,
+     *          @OA\JsonContent(
+     *              @OA\Property(property="name", type="string"),
+     *              @OA\Property(property="email", type="string", format="email"),
+     *              @OA\Property(property="password", type="string", format="password"),
+     *              @OA\Property(property="password_confirmation", type="string", format="password"),
+     *              @OA\Property(property="role", type="string", enum={"admin","user"})
+     *          )
+     *      ),
+     *      @OA\Response(response=200, description="User updated successfully"),
+     *      @OA\Response(response=404, description="User not found"),
+     *      @OA\Response(response=403, description="Unauthorized")
+     * )
+     */
+    public function updateUser(Request $request, $id)
+    {
+        $admin = $request->user();
+        if ($admin->role !== 'admin') return response()->json(['message' => 'Unauthorized'], 403);
+
+        $user = User::find($id);
+        if (!$user) return response()->json(['message' => 'User not found'], 404);
+
+        $f = $request->validate([
+            'name' => 'sometimes|required|string|max:255|unique:users,name,' . $id,
+            'email' => 'sometimes|required|email|unique:users,email,' . $id,
+            'password' => 'nullable|confirmed|min:4',
+            'role' => 'sometimes|required|string|in:admin,user'
+        ]);
+
+        if (isset($f['name'])) $user->name = $f['name'];
+        if (isset($f['email'])) $user->email = $f['email'];
+        if (isset($f['password'])) $user->password = bcrypt($f['password']);
+        if (isset($f['role'])) $user->role = $f['role'];
+
+        $user->save();
+
+        return response()->json(['user' => $user]);
+    }
+
+    // ------------------- Delete User -------------------
+    /**
+     * @OA\Delete(
+     *      path="/api/users/{id}",
+     *      summary="Delete a user",
+     *      tags={"Auth"},
+     *      security={{"sanctum":{}}},
+     *      @OA\Parameter(
+     *          name="id",
+     *          in="path",
+     *          required=true,
+     *          @OA\Schema(type="integer")
+     *      ),
+     *      @OA\Response(response=200, description="User deleted successfully"),
+     *      @OA\Response(response=404, description="User not found"),
+     *      @OA\Response(response=403, description="Unauthorized")
+     * )
+     */
+    public function deleteUser(Request $request, $id)
+    {
+        $admin = $request->user();
+        if ($admin->role !== 'admin') return response()->json(['message' => 'Unauthorized'], 403);
+
+        $user = User::find($id);
+        if (!$user) return response()->json(['message' => 'User not found'], 404);
+
+        $user->delete();
+
+        return response()->json(['message' => 'User deleted successfully']);
+    }
+
 
 }
