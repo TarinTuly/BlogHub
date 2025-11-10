@@ -240,7 +240,11 @@ window.addUserForm = function() {
             body: formData
         })
         .then(res => res.json())
-        .then(() => loadUserInfo()) // 🔹 refresh table like loadUserInfo
+        //.then(() => loadUserInfo()) // 🔹 refresh table like loadUserInfo
+        .then(() => {
+          const lastPage = parseInt(localStorage.getItem('currentPage')) || 1;
+        loadUserInfo(lastPage);
+         })
         .catch(() => alert('Error adding user'));
     });
 }
@@ -274,7 +278,10 @@ window.editUserForm = function(id, name, email, role) {
             body: formData
         })
         .then(res => res.json())
-        .then(() => loadUserInfo()) // 🔹 refresh table
+        .then(() => {
+    const lastPage = parseInt(localStorage.getItem('currentPage')) || 1;
+    loadUserInfo(lastPage);
+})
         .catch(() => alert('Error updating user'));
     });
 }
@@ -288,7 +295,10 @@ window.deleteUser = function(id) {
         headers: { 'Authorization': 'Bearer ' + token }
     })
     .then(res => res.json())
-    .then(() => loadUserInfo()) // 🔹 refresh table
+    .then(() => {
+    const lastPage = parseInt(localStorage.getItem('currentPage')) || 1;
+    loadUserInfo(lastPage);
+})
     .catch(() => alert('Error deleting user'));
 }
 
