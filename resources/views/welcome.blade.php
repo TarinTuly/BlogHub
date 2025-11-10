@@ -114,6 +114,204 @@
                 });
                 sidebar.appendChild(logoutDiv);
 
+
+
+
+
+
+
+
+
+
+
+
+
+            // ------------------- Load Posts -------------------
+// ------------------- Load Posts -------------------
+function loadPosts() {
+    fetch('/api/posts', {
+        headers: {
+            'Authorization': 'Bearer ' + token,
+            'Accept': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(posts => {
+        let html = `<div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Posts</h2>
+                <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addPostForm()">+ Add Post</button>
+            </div>`;
+
+        if (posts.length === 0) {
+            html += `<p class="text-gray-500">No posts available.</p>`;
+            document.getElementById('mainContent').innerHTML = html;
+            return;
+        }
+
+        if (user.role === 'admin') {
+            // Admin view: ID, Title, Body, Done By, Date
+            html += `
+                <table class="table-auto w-full border border-gray-300 text-center">
+                    <thead>
+                        <tr class="bg-blue-600 text-white font-bold">
+                            <th class="border p-2">ID</th>
+                            <th class="border p-2">Title</th>
+                            <th class="border p-2">Body</th>
+                            <th class="border p-2">Done By</th>
+                            <th class="border p-2">Date</th>
+                            <th class="border p-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            posts.forEach(post => {
+                html += `
+                    <tr class="hover:bg-gray-100">
+                        <td class="border p-2">${post.id}</td>
+                        <td class="border p-2">${post.title}</td>
+                        <td class="border p-2">${post.body}</td>
+                        <td class="border p-2">${post.user ? post.user.name : 'Unknown'}</td>
+                        <td class="border p-2">${new Date(post.created_at).toLocaleString()}</td>
+                        <td class="border p-2">
+                            <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editPostForm(${post.id}, '${post.title}', '${post.body}')">Edit</button>
+                            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deletePost(${post.id})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table>`;
+        } else {
+            // Normal user view: Serial, Date, Title, Body
+            html += `
+                <table class="table-auto w-full border border-gray-300 text-center">
+                    <thead>
+                        <tr class="bg-blue-600 text-white font-bold">
+                            <th class="border p-2">#</th>
+                            <th class="border p-2">Date</th>
+                            <th class="border p-2">Title</th>
+                            <th class="border p-2">Body</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            posts.forEach((post, index) => {
+                html += `
+                    <tr class="hover:bg-gray-100">
+                        <td class="border p-2">${index + 1}</td>
+                        <td class="border p-2">${new Date(post.created_at).toLocaleString()}</td>
+                        <td class="border p-2">${post.title}</td>
+                        <td class="border p-2">${post.body}</td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table>`;
+        }
+
+        document.getElementById('mainContent').innerHTML = html;
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error loading posts.</p>`;
+    });
+}
+
+
+// ------------------- Add Post Form -------------------
+// ------------------- Add Post Form -------------------
+window.addPostForm = function() {
+    const main = document.getElementById('mainContent');
+
+    // Function to render the form
+    function renderForm(userSelectHtml = '') {
+        main.innerHTML = `
+            <h2 class="text-xl font-bold mb-4">Add New Post</h2>
+            <form id="addPostForm" class="space-y-4">
+                ${userSelectHtml}
+                <input type="text" name="title" placeholder="Title" class="border p-2 w-full rounded" required>
+                <textarea name="body" placeholder="Body" class="border p-2 w-full rounded" required></textarea>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Save
+                </button>
+            </form>
+        `;
+
+        const form = document.getElementById('addPostForm');
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const formData = new FormData(form);
+
+            // Admin: check if user is selected
+            if (user.role === 'admin') {
+                const userSelect = form.querySelector('select[name="user_id"]');
+                if (!userSelect.value) {
+                    alert('Please select a user for this post.');
+                    return;
+                }
+            } else {
+                // Normal user: force post to self
+                formData.set('user_id', user.id);
+            }
+
+            fetch('/api/posts', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+                },
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) return res.json().then(err => { throw err; });
+                return res.json();
+            })
+            .then(data => {
+                alert('Post added successfully!');
+                loadPosts(); // refresh posts
+            })
+            .catch(err => {
+                console.error(err);
+                alert(err.error || 'Error adding post');
+            });
+        });
+    }
+
+    // Admin: fetch users for select dropdown
+    if (user.role === 'admin') {
+        fetch('/api/users', {
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            const options = data.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+            const selectHtml = `
+                <select name="user_id" class="border p-2 w-full rounded" required>
+                    <option value="">Select User</option>
+                    ${options}
+                </select>
+            `;
+            renderForm(selectHtml);
+        })
+        .catch(() => renderForm()); // fallback if fetch fails
+    } else {
+        // Normal user: no select needed
+        renderForm();
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
                 // -------------------------------
                 // Functions for User Info
                 // -------------------------------
