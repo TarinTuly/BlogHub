@@ -128,93 +128,188 @@
 
             // ------------------- Load Posts -------------------
 // ------------------- Load Posts -------------------
-function loadPosts() {
+function loadPosts(page = 1) {
     fetch('/api/posts', {
-        headers: {
-            'Authorization': 'Bearer ' + token,
-            'Accept': 'application/json'
-        }
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
     })
     .then(res => res.json())
     .then(posts => {
-        let html = `<div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Posts</h2>
-                <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addPostForm()">+ Add Post</button>
-            </div>`;
-
-        if (posts.length === 0) {
-            html += `<p class="text-gray-500">No posts available.</p>`;
-            document.getElementById('mainContent').innerHTML = html;
+        if(posts.length === 0){
+            document.getElementById('mainContent').innerHTML = `<p class="text-gray-500">No posts available.</p>`;
             return;
         }
 
-        if (user.role === 'admin') {
-            // Admin view: ID, Title, Body, Done By, Date
-            html += `
-                <table class="table-auto w-full border border-gray-300 text-center">
-                    <thead>
-                        <tr class="bg-blue-600 text-white font-bold">
-                            <th class="border p-2">ID</th>
-                            <th class="border p-2">Title</th>
-                            <th class="border p-2">Body</th>
-                            <th class="border p-2">Done By</th>
-                            <th class="border p-2">Date</th>
-                            <th class="border p-2">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            posts.forEach(post => {
-                html += `
-                    <tr class="hover:bg-gray-100">
-                        <td class="border p-2">${post.id}</td>
-                        <td class="border p-2">${post.title}</td>
-                        <td class="border p-2">${post.body}</td>
-                        <td class="border p-2">${post.user ? post.user.name : 'Unknown'}</td>
-                        <td class="border p-2">${new Date(post.created_at).toLocaleString()}</td>
-                        <td class="border p-2">
-                            <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editPostForm(${post.id}, '${post.title}', '${post.body}')">Edit</button>
-                            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deletePost(${post.id})">Delete</button>
-                        </td>
-                    </tr>
-                `;
+        if(user.role === 'admin'){
+            renderPaginatedTable(posts, 'mainContent', [
+                { header:'ID', key:'id' },
+                { header:'Title', key:'title' },
+                { header:'Body', key:'body' },
+                { header:'Done By', key:'user', render: p => p.user ? p.user.name : 'Unknown' },
+                { header:'Date', key:'created_at', render: p => new Date(p.created_at).toLocaleString() }
+            ], 10, page, {
+                addTopHtml:`<div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-bold">Posts</h2>
+                                <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addPostForm()">+ Add Post</button>
+                            </div>`,
+                addRowActions: p => `<button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editPostForm(${p.id}, '${p.title}', '${p.body}')">Edit</button>
+                                     <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deletePost(${p.id})">Delete</button>`
             });
-            html += `</tbody></table>`;
         } else {
-            // Normal user view: Serial, Date, Title, Body
-            html += `
-                <table class="table-auto w-full border border-gray-300 text-center">
-                    <thead>
-                        <tr class="bg-blue-600 text-white font-bold">
-                            <th class="border p-2">#</th>
-                            <th class="border p-2">Date</th>
-                            <th class="border p-2">Title</th>
-                            <th class="border p-2">Body</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            posts.forEach((post, index) => {
-                html += `
-                    <tr class="hover:bg-gray-100">
-                        <td class="border p-2">${index + 1}</td>
-                        <td class="border p-2">${new Date(post.created_at).toLocaleString()}</td>
-                        <td class="border p-2">${post.title}</td>
-                        <td class="border p-2">${post.body}</td>
-                    </tr>
-                `;
-            });
-            html += `</tbody></table>`;
+            renderPaginatedTable(posts, 'mainContent', [
+                { header:'#', key:null, render:(p,i,currentPage,perPage) => (currentPage-1)*perPage + i + 1 },
+                { header:'Date', key:'created_at', render:p => new Date(p.created_at).toLocaleString() },
+                { header:'Title', key:'title' },
+                { header:'Body', key:'body' }
+            ], 10, page);
         }
 
-        document.getElementById('mainContent').innerHTML = html;
+        localStorage.setItem('activeSection', 'posts');
     })
     .catch(err => {
         console.error(err);
         document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error loading posts.</p>`;
     });
 }
+//
 
+//------------pagination-------------------
+
+
+/**
+ * Universal paginated table renderer
+ * @param {Array} items - array of objects to render
+ * @param {string} containerId - element id to render table
+ * @param {Array} columns - [{header:'', key:'', render:(item,i,currentPage,perPage)=>''}]
+ * @param {number} perPage - entries per page
+ * @param {number} currentPage - starting page
+ * @param {Object} options - { addTopHtml: '', addRowActions: item=>'' }
+ */
+function renderPaginatedTable(items, containerId, columns, perPage=10, currentPage=1, options={}) {
+    const totalPages = Math.ceil(items.length / perPage);
+
+    function renderPage(page) {
+        currentPage = page;
+        let start = (page-1)*perPage;
+        let end = start + perPage;
+        const pageItems = items.slice(start,end);
+
+        let html = options.addTopHtml || '';
+        html += `<table class="table-auto w-full border border-gray-300 text-center">
+                    <thead><tr class="bg-blue-600 text-white font-bold">`;
+
+        columns.forEach(col => html += `<th class="border p-2">${col.header}</th>`);
+        if(options.addRowActions) html += `<th class="border p-2">Action</th>`;
+        html += `</tr></thead><tbody>`;
+
+        pageItems.forEach((item,i) => {
+            html += `<tr class="hover:bg-gray-100">`;
+            columns.forEach(col => {
+                html += `<td class="border p-2">${col.render ? col.render(item,i,currentPage,perPage) : item[col.key] || '-'}</td>`;
+            });
+            if(options.addRowActions) html += `<td class="border p-2">${options.addRowActions(item)}</td>`;
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table>`;
+
+        if(totalPages > 1){
+            html += `<div class="flex justify-center items-center gap-2 mt-4">
+                        <button id="prevPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${currentPage===1?'disabled':''}>Prev</button>
+                        <span class="text-gray-700">Page ${currentPage} of ${totalPages}</span>
+                        <button id="nextPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${currentPage===totalPages?'disabled':''}>Next</button>
+                     </div>`;
+        }
+
+        document.getElementById(containerId).innerHTML = html;
+
+        if(totalPages > 1){
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if(currentPage>1) renderPage(currentPage-1);
+            });
+            document.getElementById('nextPage').addEventListener('click', () => {
+                if(currentPage<totalPages) renderPage(currentPage+1);
+            });
+        }
+    }
+
+    renderPage(currentPage);
+}
+
+//-------------------------edit and delete post-----------------------
+// ------------------------- Edit Post -------------------------
+window.editPostForm = function(id, title, body) {
+    // Save current page at the time of clicking edit
+    const pageBeforeEdit = parseInt(localStorage.getItem('currentPage')) || 1;
+
+    document.getElementById('mainContent').innerHTML = `
+        <h2 class="text-xl font-bold mb-4">Edit Post</h2>
+        <form id="editPostForm" class="space-y-4">
+            <input type="text" name="title" value="${title}" class="border p-2 w-full rounded" required>
+            <textarea name="body" class="border p-2 w-full rounded" required>${body}</textarea>
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Update</button>
+        </form>
+    `;
+
+    document.getElementById('editPostForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        fetch(`/api/posts/${id}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'X-HTTP-Method-Override': 'PUT'
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(() => {
+            // fetch all posts to find the page containing the edited post
+            fetch('/api/posts', {
+                headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(posts => {
+                const perPage = 10; // same as your pagination
+                const index = posts.findIndex(p => p.id === id);
+                const page = Math.floor(index / perPage) + 1;
+
+                // fallback if index not found
+                loadPosts(page || pageBeforeEdit);
+            });
+        })
+        .catch(() => alert('Error updating post'));
+    });
+}
+
+// Delete Post
+window.deletePost = function(id) {
+    // Ask before deleting
+    if (!confirm('Are you sure you want to delete this post?')) return;
+
+    // Save current page
+    const currentPage = parseInt(localStorage.getItem('currentPage')) || 1;
+
+    fetch(`/api/posts/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(res => res.json())
+    .then(() => {
+        // Reload posts on the same page
+        fetch('/api/posts', {
+            headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(posts => {
+            const perPage = 10;
+            const totalPages = Math.ceil(posts.length / perPage);
+            const pageToLoad = currentPage > totalPages ? totalPages : currentPage;
+            loadPosts(pageToLoad || 1);
+        });
+    })
+    .catch(() => alert('Error deleting post'));
+}
 
 // ------------------- Add Post Form -------------------
 // ------------------- Add Post Form -------------------
@@ -315,94 +410,37 @@ window.addPostForm = function() {
                 // -------------------------------
                 // Functions for User Info
                 // -------------------------------
-                function loadUserInfo(page =1) {
+                function loadUserInfo(page = 1) {
                     fetch('/api/users', {
                         headers: {
                             'Authorization': 'Bearer ' + token,
                             'Accept': 'application/json'
                         }
                     })
-                    .then(res => res.json())
-                    .then(data => {
-                        const users = data.users;
-                        const itemsPerPage = 10;
-                        let currentPage = page;
-                        const totalPages = Math.ceil(users.length / itemsPerPage);
-
-                        function renderTable(page) {
-                            currentPage = page;
-                            localStorage.setItem('currentPage', currentPage);
-                            let start = (page - 1) * itemsPerPage;
-                            let end = start + itemsPerPage;
-                            let paginatedUsers = users.slice(start, end);
-
-                            let html = `
-                                <div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-xl font-bold">User Info</h2>
-                                    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addUserForm()">+ Add User</button>
-                                </div>
-
-                                <table class="table-auto w-full border border-gray-300 text-center">
-                                    <thead>
-                                        <tr class="bg-blue-600 text-white font-bold">
-                                            <th class="border p-2">Name</th>
-                                            <th class="border p-2">Email</th>
-                                            <th class="border p-2">Role</th>
-                                            <th class="border p-2">Profile</th>
-                                            <th class="border p-2">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                            `;
-
-                            paginatedUsers.forEach(u => {
-                                html += `
-                                    <tr class="hover:bg-gray-100">
-                                        <td class="border p-2">${u.name}</td>
-                                        <td class="border p-2">${u.email}</td>
-                                        <td class="border p-2">${u.role || '-'}</td>
-
-                                        <td class="border p-2 text-center">
-                                         ${u.avatar_url ? `<img src="${u.avatar_url}" class="w-12 h-12 mx-auto">` : 'No avatar'}</td>
-
-                                        <td class="border p-2">
-                                            <button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editUserForm(${u.id}, '${u.name}', '${u.email}', '${u.role}')">Edit</button>
-                                            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deleteUser(${u.id})">Delete</button>
-                                        </td>
-                                    </tr>
-                                `;
+                        .then(res => res.json())
+                        .then(data => {
+                            const users = data.users;
+                            const lastPage = parseInt(localStorage.getItem('currentPage')) || page;
+                            renderPaginatedTable(users, 'mainContent', [
+                                { header: 'Name', key: 'name' },
+                                { header: 'Email', key: 'email' },
+                                { header: 'Role', key: 'role' },
+                                { header: 'Profile', key: 'avatar_url', render: u => u.avatar_url ? `<img src="${u.avatar_url}" class="w-12 h-12 mx-auto">` : 'No avatar' }
+                            ], 10, lastPage, {
+                                addTopHtml: `<div class="flex justify-between items-center mb-4">
+                           <h2 class="text-xl font-bold">User Info</h2>
+                           <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addUserForm()">+ Add User</button>
+                       </div>`,
+                                addRowActions: u => `<button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editUserForm(${u.id}, '${u.name}', '${u.email}', '${u.role}')">Edit</button>
+                                 <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deleteUser(${u.id})">Delete</button>`
                             });
 
-                            html += `</tbody></table>
-                                <div class="flex justify-center items-center gap-2 mt-4">
-                                    <button id="prevPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${page === 1 ? 'disabled' : ''}>Prev</button>
-                                    <span class="text-gray-700">Page ${page} of ${totalPages}</span>
-                                    <button id="nextPage" class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400" ${page === totalPages ? 'disabled' : ''}>Next</button>
-                                </div>
-                            `;
+                            localStorage.setItem('activeSection', 'userInfo');
 
-                            document.getElementById('mainContent').innerHTML = html;
-
-                            document.getElementById('prevPage').addEventListener('click', () => {
-                                if (currentPage > 1) {
-                                    currentPage--;
-                                    renderTable(currentPage);
-                                }
-                            });
-
-                            document.getElementById('nextPage').addEventListener('click', () => {
-                                if (currentPage < totalPages) {
-                                    currentPage++;
-                                    renderTable(currentPage);
-                                }
-                            });
-                        }
-
-                        renderTable(currentPage);
-                    })
-                    .catch(() => {
-                        document.getElementById('mainContent').innerHTML = `<p>Error fetching users</p>`;
-                    });
+                        })
+                        .catch(() => {
+                            document.getElementById('mainContent').innerHTML = `<p>Error fetching users</p>`;
+                        });
                 }
 
 
@@ -502,6 +540,7 @@ window.deleteUser = function(id) {
 
 // Restore last active section on refresh
 // -------------------------------
+
 const activeSection = localStorage.getItem('activeSection');
 const lastPage = parseInt(localStorage.getItem('currentPage')) || 1;
 
@@ -510,7 +549,14 @@ if(activeSection === 'posts') {
 } else if(activeSection === 'userInfo' && user.role === 'admin') {
     loadUserInfo(lastPage); // pass last page
 } else {
-    document.getElementById('mainContent').innerHTML = `<p>Select a section to view information...</p>`;
+
+    // Default view after login
+    document.getElementById('mainContent').innerHTML = `
+        <div class="text-center py-10">
+            <h2 class="text-2xl font-bold text-gray-800">Welcome, ${user.name}!</h2>
+            <p class="text-gray-600 mt-2">Use the sidebar to navigate.</p>
+        </div>
+    `;
 }
 
 

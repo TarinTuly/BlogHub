@@ -88,6 +88,91 @@ class PostController extends Controller
     ], 201);
 }
 
+
+
+// Update Post
+/**
+ * @OA\Put(
+ *     path="/api/posts/{id}",
+ *     summary="Update a post",
+ *     tags={"Posts"},
+ *     security={{"sanctum":{}}},
+ *     @OA\Parameter(
+ *         name="id",
+ *         in="path",
+ *         description="Post ID",
+ *         required=true,
+ *         @OA\Schema(type="integer")
+ *     ),
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\MediaType(
+ *             mediaType="multipart/form-data",
+ *             @OA\Schema(
+ *                 required={"title","body"},
+ *                 @OA\Property(property="title", type="string", example="Updated title"),
+ *                 @OA\Property(property="body", type="string", example="Updated body")
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Post updated successfully"
+ *     )
+ * )
+ */
+public function update(Request $request, $id)
+{
+    $post = Post::findOrFail($id);
+
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'body' => 'required|string',
+    ]);
+
+    $post->update($validated);
+
+    return response()->json([
+        'message' => 'Post updated successfully',
+        'post' => $post
+    ]);
+}
+
+
+// Delete Post
+/**
+ * @OA\Delete(
+ *     path="/api/posts/{id}",
+ *     summary="Delete a post",
+ *     tags={"Posts"},
+ *     security={{"sanctum":{}}},
+ *     @OA\Parameter(
+ *         name="id",
+ *         in="path",
+ *         description="Post ID",
+ *         required=true,
+ *         @OA\Schema(type="integer")
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Post deleted successfully"
+ *     )
+ * )
+ */
+public function destroy($id)
+{
+    $post = Post::find($id);
+
+    if (!$post) {
+        return response()->json(['error' => 'Post not found'], 404);
+    }
+
+    $post->delete();
+
+    return response()->json(['message' => 'Post deleted successfully']);
+}
+
+
 }
 
 

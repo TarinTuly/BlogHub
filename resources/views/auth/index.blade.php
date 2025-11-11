@@ -150,7 +150,7 @@ document.getElementById('loginForm').addEventListener('submit', async e=>{
         const json = await res.json();
         if(res.ok){
             localStorage.setItem(tokenKey,json.token);
-
+             localStorage.removeItem('activeSection');
             window.location.href = "/welcome";
         } else if(res.status===422){
             showFieldErrors('login', json.errors);
