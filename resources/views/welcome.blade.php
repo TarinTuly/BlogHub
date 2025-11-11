@@ -160,7 +160,14 @@ function loadPosts(page = 1) {
                 { header:'Date', key:'created_at', render:p => new Date(p.created_at).toLocaleString() },
                 { header:'Title', key:'title' },
                 { header:'Body', key:'body' }
-            ], 10, page);
+            ], 10, page,{
+                addTopHtml:`<div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-bold">Posts</h2>
+                                <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addPostForm()">+ Add Post</button>
+                            </div>`,
+                addRowActions: p => `<button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editPostForm(${p.id}, '${p.title}', '${p.body}')">Edit</button>
+                                     <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deletePost(${p.id})">Delete</button>`
+            });
         }
 
         localStorage.setItem('activeSection', 'posts');
