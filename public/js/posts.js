@@ -1,5 +1,6 @@
 // posts.js
 import { renderPaginatedTable } from './pagination.js';
+import { loadComments } from './comment.js';
 
 // This "factory" creates all post functions, giving them access to token, user, etc.
 export function createPostFunctions(token, user) {
@@ -8,7 +9,7 @@ export function createPostFunctions(token, user) {
     function loadPosts(page = 1) {
         const lastPage = parseInt(localStorage.getItem('currentPage')) || page;
 
-        fetch('/api/posts', {
+        fetch(`/api/posts`, {
             headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
         })
         .then(res => res.json())
@@ -18,7 +19,7 @@ export function createPostFunctions(token, user) {
                 return;
             }
 
-            if (user.role === 'admin') {
+            if (user.role === 'admin' ) {
                 renderPaginatedTable(posts, 'mainContent', [
                     { header: 'ID', key: 'id' },
                     { header: 'Title', key: 'title' },
@@ -55,6 +56,10 @@ export function createPostFunctions(token, user) {
             document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error loading posts.</p>`;
         });
     }
+
+    // ------------------- Load All Posts (excluding own) -------------------
+
+
 
     // ------------------- Add Post Form -------------------
     window.addPostForm = function() {
@@ -161,8 +166,89 @@ export function createPostFunctions(token, user) {
         .catch(() => alert('Error deleting post'));
     }
 
+
+
+function AllloadPosts(page = 1) {
+    const lastPage = parseInt(localStorage.getItem('currentPage')) || page;
+
+    fetch(`/api/posts/others`, {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(posts => {
+        const main = document.getElementById('mainContent');
+        if (posts.length === 0) {
+            main.innerHTML = `<p class="text-gray-500 text-center mt-10">No posts available.</p>`;
+            return;
+        }
+
+        main.innerHTML = posts.map(post => `
+            <div class="bg-white shadow rounded-md p-4 mb-4" id="post-${post.id}">
+                <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-700 font-bold mr-2">
+                        ${post.user ? post.user.name.charAt(0).toUpperCase() : '?'}
+                    </div>
+                    <div>
+                        <p class="font-bold text-gray-800">${post.user ? post.user.name : 'Unknown'}</p>
+                        <p class="text-gray-500 text-sm">${new Date(post.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+                <h3 class="font-semibold text-lg mb-1">${post.title}</h3>
+                <p class="text-gray-700 mb-2">${post.body}</p>
+
+                <!-- Like + Comment count + Comment toggle -->
+                <div class="flex items-center mb-2 space-x-4 text-gray-600">
+                    <button onclick="toggleLike(${post.id})" class="like-btn" data-liked="false">👍 Like</button>
+                    <button onclick="toggleComments(${post.id})" class="text-blue-600">💬 Comments (<span id="commentCount-${post.id}">${post.comment_count}</span>)</button>
+                </div>
+
+                <!-- Comments section -->
+                <div id="commentSection-${post.id}" class="hidden">
+                    <div id="comments-${post.id}" class="mt-2 space-y-2"></div>
+                </div>
+            </div>
+        `).join('');
+
+        // Load comments for each post
+        posts.forEach(post => {
+            loadComments(post.id); // This will render all nested replies
+        });
+
+        localStorage.setItem('activeSection', 'AllPosts');
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById('mainContent').innerHTML = `<p class="text-red-500 text-center mt-10">Error loading posts.</p>`;
+    });
+}
+
+// Toggle comment section visibility
+window.toggleComments = function(postId) {
+    const section = document.getElementById(`commentSection-${postId}`);
+    if (!section) return;
+    section.classList.toggle('hidden');
+};
+
+// ---- Like toggle (you can later connect to backend API) ----
+window.toggleLike = async function(postId) {
+    try {
+        await fetch(`/api/posts/${postId}/like`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        AllloadPosts(); // reload posts to refresh like count
+    } catch (err) {
+        console.error(err);
+        alert('Failed to like post');
+    }
+};
+
+
+
     // Return the main function that other modules will need to call
     return {
-        loadPosts
+        loadPosts,
+        AllloadPosts
+
     };
 }

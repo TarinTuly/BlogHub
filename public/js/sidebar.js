@@ -11,17 +11,18 @@ export function initializeSidebar(user, token, callbacks) {
     sidebarElement.innerHTML = `<h2 class="text-xl font-bold mb-20">Dashboard</h2>`;
 
     // Posts
-    const postsDiv = document.createElement('div');
-    postsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
-    postsDiv.textContent = 'Posts';
-    postsDiv.addEventListener('click', () => {
-        callbacks.loadPosts(1); // Load page 1
-        localStorage.setItem('activeSection', 'posts');
-    });
-    sidebarElement.appendChild(postsDiv);
+
 
     // Admin-only links
     if (user.role === 'admin') {
+        const postsDiv = document.createElement('div');
+        postsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
+        postsDiv.textContent = 'Posts';
+        postsDiv.addEventListener('click', () => {
+        callbacks.loadPosts(1); // Load page 1
+        localStorage.setItem('activeSection', 'posts');
+       });
+       sidebarElement.appendChild(postsDiv);
         // Comments
         const commentsDiv = document.createElement('div');
         commentsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
@@ -41,6 +42,25 @@ export function initializeSidebar(user, token, callbacks) {
             localStorage.setItem('activeSection', 'userInfo');
         });
         sidebarElement.appendChild(userInfoDiv);
+    }else{
+        const postsDiv = document.createElement('div');
+        postsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
+        postsDiv.textContent = 'My Posts';
+        postsDiv.addEventListener('click', () => {
+        callbacks.loadPosts(1); // Load page 1
+        localStorage.setItem('activeSection', 'posts');
+        });
+        sidebarElement.appendChild(postsDiv);
+
+        // All Posts
+        const allPostsDiv = document.createElement('div');
+        allPostsDiv.className = 'text-center font-bold text-lg hover:bg-blue-500 cursor-pointer py-2 rounded';
+        allPostsDiv.textContent = 'Others Posts';
+        allPostsDiv.addEventListener('click', () => {
+            callbacks.AllloadPosts(1); // loadPosts is the function for all posts
+            localStorage.setItem('activeSection', 'AllPosts');
+        });
+        sidebarElement.appendChild(allPostsDiv);
     }
 
     // Logout
@@ -75,7 +95,9 @@ export function restoreActiveSection(user, callbacks) {
 
     if (activeSection === 'posts') {
         callbacks.loadPosts(lastPage);
-    } else if (activeSection === 'userInfo' && user.role === 'admin') {
+    } else if (activeSection === 'AllPosts') {
+        callbacks.AllloadPosts(lastPage); // load others posts
+    }else if (activeSection === 'userInfo' && user.role === 'admin') {
         callbacks.loadUserInfo(lastPage);
     } else if (activeSection === 'comments' && user.role === 'admin') {
         callbacks.loadComments();

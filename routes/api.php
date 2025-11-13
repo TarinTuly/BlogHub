@@ -4,7 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PostController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\CommentController;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -51,5 +51,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('posts', [PostController::class, 'store']);
     Route::put('/posts/{id}', [PostController::class, 'update']);
     Route::delete('/posts/{id}', [PostController::class, 'destroy']);
+    Route::get('/posts/others', [PostController::class, 'otherPosts']);
 });
+
+
+
+
+
+// All routes protected by auth:sanctum
+Route::middleware('auth:sanctum')->group(function () {
+
+    // Get all comments for a post
+    Route::get('/posts/{post}/comments', [CommentController::class, 'index']);
+
+    // Add a comment or reply
+    Route::post('/posts/{post}/comments', [CommentController::class, 'store']);
+
+    // Update a comment (only owner)
+    Route::put('/comments/{comment}', [CommentController::class, 'update']);
+
+    // Delete a comment and its replies (only owner)
+    Route::delete('/comments/{comment}', [CommentController::class, 'destroy']);
+});
+
 

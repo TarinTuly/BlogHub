@@ -26,7 +26,7 @@ if (!token) {
         }
 
         // --- 2. Create all our functions by passing dependencies ---
-        const { loadPosts } = createPostFunctions(token, user);
+        const { loadPosts ,AllloadPosts} = createPostFunctions(token, user);
         const { loadUserInfo } = createUserFunctions(token, user);
 
         // (Placeholder for comments)
@@ -38,6 +38,7 @@ if (!token) {
         // --- 3. Pack callbacks for the sidebar ---
         const callbacks = {
             loadPosts,
+            AllloadPosts,
             loadUserInfo,
             loadComments
         };

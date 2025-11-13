@@ -173,6 +173,23 @@ public function destroy($id)
 }
 
 
+
+
+
+
+  public function otherPosts()
+    {
+        $user = Auth::user();
+        $posts = Post::where('user_id', '!=', $user->id)
+                     ->with('user')
+                     ->latest()
+                     ->get();
+
+        return response()->json($posts);
+    }
 }
+
+
+
 
 
