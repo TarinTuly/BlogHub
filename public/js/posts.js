@@ -14,10 +14,14 @@ export function createPostFunctions(token, user) {
         })
         .then(res => res.json())
         .then(posts => {
-            if (posts.length === 0) {
-                document.getElementById('mainContent').innerHTML = `<p class="text-gray-500">No posts available.</p>`;
+           if (posts.length === 0) {
+                 document.getElementById('mainContent').innerHTML = `
+                 <div class="text-center mt-10">
+                    <p class="text-gray-500 mb-4">No posts available.</p>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addPostForm()">+ Add Post</button>
+                 </div>`;
                 return;
-            }
+           }
 
             if (user.role === 'admin' ) {
                 renderPaginatedTable(posts, 'mainContent', [
@@ -34,21 +38,68 @@ export function createPostFunctions(token, user) {
                     addRowActions: p => `<button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editPostForm(${p.id}, '${p.title}', '${p.body}')">Edit</button>
                                          <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deletePost(${p.id})">Delete</button>`
                 });
-            } else {
-                renderPaginatedTable(posts, 'mainContent', [
-                    { header: '#', key: null, render: (p, i, currentPage, perPage) => (currentPage - 1) * perPage + i + 1 },
-                    { header: 'Date', key: 'created_at', render: p => new Date(p.created_at).toLocaleString() },
-                    { header: 'Title', key: 'title' },
-                    { header: 'Body', key: 'body' }
-                ], 10, lastPage, {
-                    addTopHtml: `<div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-xl font-bold">Posts</h2>
-                                    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onclick="addPostForm()">+ Add Post</button>
-                                </div>`,
-                    addRowActions: p => `<button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600" onclick="editPostForm(${p.id}, '${p.title}', '${p.body}')">Edit</button>
-                                         <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" onclick="deletePost(${p.id})">Delete</button>`
-                });
-            }
+            }else {
+    const main = document.getElementById('mainContent');
+
+
+
+    main.innerHTML = posts.map(post => `
+        <div class="bg-white shadow rounded-md p-4 mb-4" id="post-${post.id}">
+            <div class="flex items-center mb-2">
+                <!-- Logged-in user's profile pic + name -->
+                <div class="w-10 h-10 rounded-full overflow-hidden mr-2">
+                    <img src="${user.avatar_url || 'https://via.placeholder.com/40'}" alt="avatar" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <p class="font-bold text-gray-800">${user.name}</p>
+                    <p class="text-gray-500 text-sm">${new Date(post.created_at).toLocaleString()}</p>
+                </div>
+            </div>
+           <div class="flex justify-between items-center mb-1">
+    <h3 class="font-semibold text-lg">${post.title}</h3>
+    ${user.id ? `
+    <div class="space-x-2">
+        <button onclick="editPostForm(${post.id}, \`${post.title.replace(/`/g, '\\`')}\`, \`${post.body.replace(/`/g, '\\`')}\`)"
+        class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-sm">Edit</button>
+        <button onclick="deletePost(${post.id})"  class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">Delete</button>
+    </div>
+` : ''}
+</div>
+<p class="text-gray-700 mb-2">${post.body}</p>
+
+
+            <!-- Like + Comment count + Comment toggle -->
+            <div class="flex items-center mb-2 space-x-4 text-gray-600">
+                <button onclick="toggleLike(${post.id})" class="like-btn" data-liked="false">👍 Like</button>
+                <button onclick="toggleComments(${post.id})" class="text-blue-600">
+                    💬 Comments (<span id="commentCount-${post.id}">${post.comment_count}</span>)
+                </button>
+            </div>
+
+            <!-- Comments section -->
+            <div id="commentSection-${post.id}" class="hidden">
+                <!-- Add Comment Form -->
+                <form onsubmit="addComment(event, ${post.id})" class="mt-2">
+                    <input type="text" name="body" placeholder="Write a comment..." class="border p-2 w-full rounded" required>
+                    <button class="bg-blue-600 text-white px-3 py-1 rounded mt-2">Comment</button>
+                </form>
+
+                <!-- Loaded comments -->
+                <div id="comments-${post.id}" class="mt-2 space-y-2"></div>
+            </div>
+        </div>
+    `).join('');
+
+    // Load all comments + replies for each post
+    posts.forEach(post => {
+        loadComments(post.id); // render nested replies too
+    });
+
+    localStorage.setItem('activeSection', 'posts');
+}
+
+
+
             localStorage.setItem('activeSection', 'posts');
         })
         .catch(err => {
@@ -240,13 +291,20 @@ window.toggleComments = function(postId) {
 };
 
 // ---- Like toggle (you can later connect to backend API) ----
+// ---- Like toggle ----
 window.toggleLike = async function(postId) {
     try {
         await fetch(`/api/posts/${postId}/like`, {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + token }
         });
-        AllloadPosts(); // reload posts to refresh like count
+
+        // For normal users, reload their own posts only
+        if (user.role === 'admin') {
+            AllloadPosts(); // admin can see all posts
+        } else {
+            loadPosts(); // normal user reloads only their own posts
+        }
     } catch (err) {
         console.error(err);
         alert('Failed to like post');
