@@ -22,9 +22,13 @@ class Comment extends Model
     }
 
     // Each comment can have replies (self relationship)
-    public function replies() {
-        return $this->hasMany(Comment::class, 'parent_id');
-    }
+    // public function replies() {
+    //     return $this->hasMany(Comment::class, 'parent_id');
+    // }
+    public function replies()
+{
+    return $this->hasMany(Comment::class, 'parent_id')->with('user', 'replies');
+}
 
     // Optional: for like functionality later
     // public function likes() {

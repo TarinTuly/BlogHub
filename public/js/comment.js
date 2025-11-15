@@ -1,9 +1,33 @@
-// comment.js
 const token = localStorage.getItem('auth_token');
+const currentUserId = Number(localStorage.getItem('user_id')); // logged-in user id
 
 /**
- * Fetch comments for a specific post
- * @param {number} postId
+ * Add a comment
+ */
+window.addComment = async function (e, postId) {
+    e.preventDefault();
+    const body = e.target.body.value.trim();
+    if (!body) return;
+
+    try {
+        await fetch(`/api/posts/${postId}/comments`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({ body })
+        });
+        e.target.body.value = "";
+        loadComments(postId);
+    } catch (err) {
+        console.error(err);
+        alert("Failed to add comment");
+    }
+};
+
+/**
+ * Load comments
  */
 export async function loadComments(postId) {
     try {
@@ -14,9 +38,10 @@ export async function loadComments(postId) {
             }
         });
         const comments = await res.json();
-
-        // render in the correct post container
         renderComments(postId, comments);
+        // update comment count
+        const countSpan = document.getElementById(`commentCount-${postId}`);
+        if(countSpan) countSpan.textContent = countComments(comments);
     } catch (err) {
         console.error(err);
         const container = document.getElementById(`comments-${postId}`);
@@ -25,35 +50,44 @@ export async function loadComments(postId) {
 }
 
 /**
- * Render comments recursively for replies
- * @param {number} postId
- * @param {Array} comments
- * @param {HTMLElement} container
+ * Recursive comment count
  */
-function renderComments(postId, comments, container = null) {
-    // Target the specific post's comment container
-    if (!container) container = document.getElementById(`comments-${postId}`);
-    if (!container) return; // fail-safe
+function countComments(comments) {
+    let total = 0;
+    comments.forEach(c => {
+        total += 1;
+        if (c.replies) total += countComments(c.replies);
+    });
+    return total;
+}
 
-    container.innerHTML = ''; // clear previous
+/**
+ * Render comments recursively
+ */
+function renderComments(postId, comments, container = null, isRoot = true) {
+    if (!container) container = document.getElementById(`comments-${postId}`);
+    if (!container) return;
+
+    if (isRoot) container.innerHTML = ''; // clear only top-level
 
     comments.forEach(comment => {
         const commentDiv = document.createElement('div');
-        commentDiv.className = 'flex gap-2 mb-2 items-start'; // flex for avatar + content
+        commentDiv.className = 'flex gap-2 mb-2 items-start';
 
-        // Avatar
         const avatarUrl = comment.user.avatar_url || 'https://via.placeholder.com/40';
         const avatarHtml = `<img src="${avatarUrl}" class="w-8 h-8 rounded-full object-cover" alt="avatar">`;
 
-        // Content
         const contentHtml = `
             <div class="flex-1">
-                <p class="font-semibold text-sm">${comment.user.name} <span class="text-gray-500 text-xs">${new Date(comment.created_at).toLocaleString()}</span></p>
+                <p class="font-semibold text-sm">
+                    ${comment.user.name}
+                    <span class="text-gray-500 text-xs">${new Date(comment.created_at).toLocaleString()}</span>
+                </p>
                 <p id="body-${comment.id}" class="text-gray-800">${comment.body}</p>
                 <div class="flex gap-2 mt-1">
                     <button onclick="showReplyForm(${postId}, ${comment.id})" class="text-blue-600 text-xs">Reply</button>
-                    ${comment.can_edit ? `<button onclick="editComment(${comment.id})" class="text-green-600 text-xs">Edit</button>` : ''}
-                    ${comment.can_delete ? `<button onclick="deleteComment(${comment.id}, ${postId})" class="text-red-600 text-xs">Delete</button>` : ''}
+                    ${comment.user.id === currentUserId ? `<button onclick="editComment(${comment.id}, ${postId})" class="text-green-600 text-xs">Edit</button>` : ''}
+                    ${comment.user.id === currentUserId ? `<button onclick="deleteComment(${comment.id}, ${postId})" class="text-red-600 text-xs">Delete</button>` : ''}
                 </div>
                 <div id="replies-${comment.id}" class="ml-6 mt-2 space-y-2"></div>
             </div>
@@ -62,9 +96,9 @@ function renderComments(postId, comments, container = null) {
         commentDiv.innerHTML = avatarHtml + contentHtml;
         container.appendChild(commentDiv);
 
-        // Recursively render replies
         if (comment.replies && comment.replies.length > 0) {
-            renderComments(postId, comment.replies, commentDiv.querySelector(`#replies-${comment.id}`));
+            const replyContainer = commentDiv.querySelector(`#replies-${comment.id}`);
+            renderComments(postId, comment.replies, replyContainer, false);
         }
     });
 }
@@ -77,12 +111,11 @@ window.showReplyForm = function(postId, parentId) {
     const replyDiv = document.getElementById(`replies-${parentId}`);
     if (!replyDiv) return;
 
-    // Remove any existing reply form first
     const existingForm = replyDiv.querySelector('form.reply-form');
     if (existingForm) existingForm.remove();
 
     const form = document.createElement('form');
-    form.className = 'mb-2 reply-form'; // mark as reply form
+    form.className = 'mb-2 reply-form';
     form.innerHTML = `
         <input type="text" name="body" placeholder="Write a reply..." class="border p-1 rounded w-full" required>
         <button type="submit" class="bg-blue-600 text-white px-2 py-1 rounded mt-1">Reply</button>
@@ -90,7 +123,8 @@ window.showReplyForm = function(postId, parentId) {
 
     form.addEventListener('submit', async e => {
         e.preventDefault();
-        const body = form.body.value;
+        const body = form.body.value.trim();
+        if (!body) return;
 
         try {
             await fetch(`/api/posts/${postId}/comments`, {
@@ -98,15 +132,12 @@ window.showReplyForm = function(postId, parentId) {
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: new URLSearchParams({ body, parent_id: parentId })
             });
-
-            // Reload comments for this post after adding
             loadComments(postId);
         } catch (err) {
             alert('Error adding reply');
         }
     });
 
-    // Add form at the **top** of replies
     replyDiv.prepend(form);
 };
 
@@ -118,7 +149,6 @@ window.editComment = function(commentId, postId) {
     if (!bodyP) return;
 
     const oldBody = bodyP.textContent;
-
     const form = document.createElement('form');
     form.innerHTML = `
         <input type="text" name="body" value="${oldBody}" class="border p-1 rounded w-full" required>
@@ -140,7 +170,7 @@ window.editComment = function(commentId, postId) {
                 },
                 body: new URLSearchParams({ body: newBody })
             });
-            loadComments(postId); // reload comments after edit
+            loadComments(postId);
         } catch (err) {
             alert('Error updating comment');
             console.error(err);
@@ -149,7 +179,7 @@ window.editComment = function(commentId, postId) {
 };
 
 /**
- * Delete comment
+ * Delete comment and all replies
  */
 window.deleteComment = async function(commentId, postId) {
     if (!confirm('Are you sure you want to delete this comment and all its replies?')) return;
@@ -159,7 +189,7 @@ window.deleteComment = async function(commentId, postId) {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        loadComments(postId); // reload comments after delete
+        loadComments(postId);
     } catch (err) {
         alert('Error deleting comment');
         console.error(err);

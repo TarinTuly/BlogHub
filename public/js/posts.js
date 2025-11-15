@@ -203,9 +203,19 @@ function AllloadPosts(page = 1) {
                 </div>
 
                 <!-- Comments section -->
-                <div id="commentSection-${post.id}" class="hidden">
-                    <div id="comments-${post.id}" class="mt-2 space-y-2"></div>
-                </div>
+               <div id="commentSection-${post.id}" class="hidden">
+
+    <!-- Add Comment Form -->
+   <form onsubmit="addComment(event, ${post.id})" class="mt-2">
+        <input type="text" name="body" placeholder="Write a comment..."
+               class="border p-2 w-full rounded" required>
+        <button class="bg-blue-600 text-white px-3 py-1 rounded mt-2">Comment</button>
+    </form>
+
+    <!-- Loaded comments -->
+    <div id="comments-${post.id}" class="mt-2 space-y-2"></div>
+</div>
+
             </div>
         `).join('');
 
