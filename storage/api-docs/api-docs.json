@@ -98,7 +98,7 @@
         "/api/users": {
             "get": {
                 "tags": [
-                    "Auth"
+                    "User"
                 ],
                 "summary": "Get all users",
                 "operationId": "7bfaf816f6d52b949a51be31f1559950",
@@ -150,7 +150,7 @@
         "/api/users/{id}": {
             "get": {
                 "tags": [
-                    "Auth"
+                    "User"
                 ],
                 "summary": "Get user by ID",
                 "operationId": "6e390560424e46b9f0549fbc4aa39904",
@@ -210,7 +210,7 @@
             },
             "put": {
                 "tags": [
-                    "Auth"
+                    "User"
                 ],
                 "summary": "Update an existing user",
                 "operationId": "88e0c3dbc8e89f363fb8006e6bf07b33",
@@ -277,7 +277,7 @@
             },
             "delete": {
                 "tags": [
-                    "Auth"
+                    "User"
                 ],
                 "summary": "Delete a user",
                 "operationId": "301e05b4ac9f9c9ed6837adacc7e2f97",
@@ -660,6 +660,59 @@
                     }
                 ]
             }
+        },
+        "/api/posts/{postId}/like": {
+            "post": {
+                "tags": [
+                    "Likes"
+                ],
+                "summary": "Toggle like on a post (like/unlike)",
+                "operationId": "c3c572bf5ec7cd3a4074ee413322bea4",
+                "parameters": [
+                    {
+                        "name": "postId",
+                        "in": "path",
+                        "description": "ID of the post to like/unlike",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully toggled like",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "liked": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "like_count": {
+                                            "type": "integer",
+                                            "example": 12
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "404": {
+                        "description": "Post not found"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
         }
     },
     "tags": [
@@ -668,12 +721,20 @@
             "description": "Auth"
         },
         {
+            "name": "User",
+            "description": "User"
+        },
+        {
             "name": "Comments",
             "description": "Comments"
         },
         {
             "name": "Posts",
             "description": "Posts"
+        },
+        {
+            "name": "Likes",
+            "description": "Likes"
         }
     ],
     "components": {

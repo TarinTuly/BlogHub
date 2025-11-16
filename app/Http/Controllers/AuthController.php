@@ -108,7 +108,7 @@ public function register(Request $request)
  * @OA\Get(
  *      path="/api/users",
  *      summary="Get all users",
- *      tags={"Auth"},
+ *      tags={"User"},
  *      security={{"sanctum":{}}},
  *      @OA\Response(
  *          response=200,
@@ -158,7 +158,7 @@ return response()->json(['users' => $users]);
  * @OA\Get(
  *      path="/api/users/{id}",
  *      summary="Get user by ID",
- *      tags={"Auth"},
+ *      tags={"User"},
  *      security={{"sanctum":{}}},
  *      @OA\Parameter(
  *          name="id",
@@ -291,7 +291,7 @@ public function getUserById(Request $request, $id)
      * @OA\Put(
      *      path="/api/users/{id}",
      *      summary="Update an existing user",
-     *      tags={"Auth"},
+     *      tags={"User"},
      *      security={{"sanctum":{}}},
      *      @OA\Parameter(
      *          name="id",
@@ -354,7 +354,7 @@ public function getUserById(Request $request, $id)
      * @OA\Delete(
      *      path="/api/users/{id}",
      *      summary="Delete a user",
-     *      tags={"Auth"},
+     *      tags={"User"},
      *      security={{"sanctum":{}}},
      *      @OA\Parameter(
      *          name="id",
