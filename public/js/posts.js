@@ -249,30 +249,32 @@ function AllloadPosts(page = 1) {
 
                 <!-- Like + Comment count + Comment toggle -->
                 <div class="flex items-center mb-2 space-x-4 text-gray-600">
-                    <button onclick="toggleLike(${post.id})" class="like-btn" data-liked="false">👍 Like</button>
-                    <button onclick="toggleComments(${post.id})" class="text-blue-600">💬 Comments (<span id="commentCount-${post.id}">${post.comment_count}</span>)</button>
+                    <button onclick="toggleLike(${post.id})" class="like-btn ${post.liked_by_user ? 'text-blue-600 font-bold' : ''}"
+                        data-liked="${post.liked_by_user ? 'true' : 'false'}">
+                        👍 ${post.liked_by_user ? 'Liked' : 'Like'} (<span id="likeCount-${post.id}">${post.like_count || 0}</span>)
+                    </button>
+                    <button onclick="toggleComments(${post.id})" class="text-blue-600">
+                        💬 Comments (<span id="commentCount-${post.id}">${post.comment_count}</span>)
+                    </button>
                 </div>
 
                 <!-- Comments section -->
-               <div id="commentSection-${post.id}" class="hidden">
+                <div id="commentSection-${post.id}" class="hidden">
+                    <!-- Add Comment Form -->
+                    <form onsubmit="addComment(event, ${post.id})" class="mt-2">
+                        <input type="text" name="body" placeholder="Write a comment..." class="border p-2 w-full rounded" required>
+                        <button class="bg-blue-600 text-white px-3 py-1 rounded mt-2">Comment</button>
+                    </form>
 
-    <!-- Add Comment Form -->
-   <form onsubmit="addComment(event, ${post.id})" class="mt-2">
-        <input type="text" name="body" placeholder="Write a comment..."
-               class="border p-2 w-full rounded" required>
-        <button class="bg-blue-600 text-white px-3 py-1 rounded mt-2">Comment</button>
-    </form>
-
-    <!-- Loaded comments -->
-    <div id="comments-${post.id}" class="mt-2 space-y-2"></div>
-</div>
-
+                    <!-- Loaded comments -->
+                    <div id="comments-${post.id}" class="mt-2 space-y-2"></div>
+                </div>
             </div>
         `).join('');
 
         // Load comments for each post
         posts.forEach(post => {
-            loadComments(post.id); // This will render all nested replies
+            loadComments(post.id); // render nested replies
         });
 
         localStorage.setItem('activeSection', 'AllPosts');
@@ -290,26 +292,73 @@ window.toggleComments = function(postId) {
     section.classList.toggle('hidden');
 };
 
-// ---- Like toggle (you can later connect to backend API) ----
-// ---- Like toggle ----
+// Toggle like functionality
 window.toggleLike = async function(postId) {
     try {
-        await fetch(`/api/posts/${postId}/like`, {
+        const res = await fetch(`/api/posts/${postId}/like`, {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + token }
         });
 
-        // For normal users, reload their own posts only
-        if (user.role === 'admin') {
-            AllloadPosts(); // admin can see all posts
+        if (!res.ok) throw new Error('Failed to like post');
+
+        const data = await res.json();
+
+        // Update like button and count dynamically
+        const likeBtn = document.querySelector(`#post-${postId} .like-btn`);
+        if (likeBtn) {
+            likeBtn.dataset.liked = data.liked ? 'true' : 'false';
+            likeBtn.textContent = data.liked ? '👍 Liked' : '👍 Like';
+        }
+
+        const countSpan = document.getElementById(`likeCount-${postId}`);
+        if (countSpan) countSpan.textContent = data.like_count;
+
+        // Determine which section is active
+        const activeSection = localStorage.getItem('activeSection');
+        if (activeSection === 'AllPosts') {
+            AllloadPosts();
         } else {
-            loadPosts(); // normal user reloads only their own posts
+            const currentPage = parseInt(localStorage.getItem('currentPage')) || 1;
+            loadPosts(currentPage);
         }
     } catch (err) {
         console.error(err);
         alert('Failed to like post');
     }
 };
+
+
+
+// ---- Like toggle (you can later connect to backend API) ----
+window.toggleLike = async function(postId) {
+    try {
+        const res = await fetch(`/api/posts/${postId}/like`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        const data = await res.json(); // parse JSON only once
+
+        if (!res.ok) throw new Error(data.error || 'Failed to like post');
+
+        // Update like button and count dynamically
+        const likeBtn = document.querySelector(`#post-${postId} .like-btn`);
+        if (likeBtn) {
+            likeBtn.dataset.liked = data.liked ? 'true' : 'false';
+            likeBtn.textContent = data.liked ? `👍 Liked (${data.like_count})` : `👍 Like (${data.like_count})`;
+        }
+
+        const countSpan = document.getElementById(`likeCount-${postId}`);
+        if (countSpan) countSpan.textContent = data.like_count;
+
+    } catch (err) {
+        console.error(err);
+        alert(err.message);
+    }
+};
+
+
 
 
 

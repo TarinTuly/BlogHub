@@ -38,7 +38,7 @@ export async function loadComments(postId) {
             }
         });
         const comments = await res.json();
-        renderComments(postId, comments);
+        renderComments(postId, comments , currentUserId); // 🌟 FIX 1: Pass currentUserId
         // update comment count
         const countSpan = document.getElementById(`commentCount-${postId}`);
         if(countSpan) countSpan.textContent = countComments(comments);
@@ -64,7 +64,13 @@ function countComments(comments) {
 /**
  * Render comments recursively
  */
-function renderComments(postId, comments, container = null, isRoot = true) {
+/**
+ * Render comments recursively (FIXED)
+ */
+/**
+ * Render comments recursively (FIXED for Type Mismatch)
+ */
+function renderComments(postId, comments, currentUserId, container = null, isRoot = true) {
     if (!container) container = document.getElementById(`comments-${postId}`);
     if (!container) return;
 
@@ -77,6 +83,9 @@ function renderComments(postId, comments, container = null, isRoot = true) {
         const avatarUrl = comment.user.avatar_url || 'https://via.placeholder.com/40';
         const avatarHtml = `<img src="${avatarUrl}" class="w-8 h-8 rounded-full object-cover" alt="avatar">`;
 
+        // 🎯 FIX: Convert comment.user.id to a Number for strict comparison
+        const isOwner = comment.user && Number(comment.user.id) === currentUserId;
+
         const contentHtml = `
             <div class="flex-1">
                 <p class="font-semibold text-sm">
@@ -86,8 +95,9 @@ function renderComments(postId, comments, container = null, isRoot = true) {
                 <p id="body-${comment.id}" class="text-gray-800">${comment.body}</p>
                 <div class="flex gap-2 mt-1">
                     <button onclick="showReplyForm(${postId}, ${comment.id})" class="text-blue-600 text-xs">Reply</button>
-                    ${comment.user.id === currentUserId ? `<button onclick="editComment(${comment.id}, ${postId})" class="text-green-600 text-xs">Edit</button>` : ''}
-                    ${comment.user.id === currentUserId ? `<button onclick="deleteComment(${comment.id}, ${postId})" class="text-red-600 text-xs">Delete</button>` : ''}
+
+                    ${isOwner ? `<button onclick="editComment(${comment.id}, ${postId})" class="text-green-600 text-xs">Edit</button>` : ''}
+                    ${isOwner ? `<button onclick="deleteComment(${comment.id}, ${postId})" class="text-red-600 text-xs">Delete</button>` : ''}
                 </div>
                 <div id="replies-${comment.id}" class="ml-6 mt-2 space-y-2"></div>
             </div>
@@ -98,12 +108,10 @@ function renderComments(postId, comments, container = null, isRoot = true) {
 
         if (comment.replies && comment.replies.length > 0) {
             const replyContainer = commentDiv.querySelector(`#replies-${comment.id}`);
-            renderComments(postId, comment.replies, replyContainer, false);
+            renderComments(postId, comment.replies, currentUserId, replyContainer, false);
         }
     });
 }
-
-
 /**
  * Show reply form
  */

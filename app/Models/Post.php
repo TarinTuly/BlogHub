@@ -31,4 +31,9 @@ class Post extends Model
             $post->comments()->delete(); // delete all comments
         });
     }
+
+    public function likes()
+   {
+    return $this->hasMany(PostLike::class);
+   }
 }
