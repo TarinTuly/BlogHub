@@ -76,5 +76,9 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->post('/posts/{post}/like', [PostLikeController::class, 'toggle']);
+//Route::middleware('auth:sanctum')->put('/user/profile', [AuthController::class, 'updateProfile']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::put('user/profile', [AuthController::class, 'updateProfile']); // matches controller
+});
 
 

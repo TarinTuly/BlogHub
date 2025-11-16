@@ -384,4 +384,64 @@ public function getUserById(Request $request, $id)
     }
 
 
+    // ------------------- UPDATE PROFILE -------------------
+    /**
+     * @OA\Put(
+     *      path="/api/user/profile",
+     *      summary="Update own profile",
+     *      tags={"Profile"},
+     *      security={{"sanctum":{}}},
+     *      @OA\RequestBody(
+     *          required=true,
+     *          @OA\JsonContent(
+     *              @OA\Property(property="name", type="string"),
+     *              @OA\Property(property="email", type="string", format="email"),
+     *              @OA\Property(property="password", type="string", format="password"),
+     *              @OA\Property(property="password_confirmation", type="string", format="password"),
+     *              @OA\Property(property="avatar", type="string", format="binary")
+     *          )
+     *      ),
+     *      @OA\Response(response=200, description="Profile updated successfully"),
+     *      @OA\Response(response=401, description="Unauthenticated")
+     * )
+     */
+
+
+public function updateProfile(Request $request)
+{
+    $user = $request->user(); // logged-in user
+
+    $f = $request->validate([
+        'name' => 'sometimes|required|string|max:255|unique:users,name,' . $user->id,
+        'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+        'password' => 'nullable|confirmed|min:4',
+    ]);
+    $p=false;
+    if (isset($f['name'])) $user->name = $f['name'];
+    if (isset($f['email'])) $user->email = $f['email'];
+    if (isset($f['password'])) $user->password = bcrypt($f['password']);
+
+    // Handle avatar upload
+    if ($request->hasFile('avatar')) {
+        // Optional: delete old avatar if exists
+        if ($user->avatar && file_exists(storage_path('app/public/' . $user->avatar))) {
+            unlink(storage_path('app/public/' . $user->avatar));
+        }
+
+        $user->avatar = $request->file('avatar')->store('avatars', 'public');
+    }
+
+    $user->save();
+
+    // Return updated user with avatar URL
+    return response()->json([
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'avatar_url' => $user->avatar ? asset('storage/' . $user->avatar) : null,
+    ]);
+}
+
+
+
 }

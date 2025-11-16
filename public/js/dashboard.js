@@ -2,6 +2,7 @@
 import { createPostFunctions } from './posts.js';
 import { createUserFunctions } from './user.js';
 import { initializeSidebar, restoreActiveSection } from './sidebar.js';
+import { initializeProfile } from './profile.js';
 
 const token = localStorage.getItem('auth_token');
 
@@ -40,7 +41,8 @@ if (!token) {
             loadPosts,
             AllloadPosts,
             loadUserInfo,
-            loadComments
+            loadComments,
+
         };
 
         // --- 4. Initialize the sidebar ---
@@ -48,6 +50,7 @@ if (!token) {
 
         // --- 5. Restore the last active section ---
         restoreActiveSection(user, callbacks);
+        initializeProfile(user, token);
 
     })
     .catch(() => {
